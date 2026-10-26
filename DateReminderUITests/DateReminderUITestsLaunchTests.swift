@@ -1,13 +1,13 @@
 //
-//  AnniversaryUITestsLaunchTests.swift
-//  AnniversaryUITests
+//  DateReminderUITestsLaunchTests.swift
+//  DateReminderUITests
 //
 //  Created by Dennis on 2026/3/20.
 //
 
 import XCTest
 
-final class AnniversaryUITestsLaunchTests: XCTestCase {
+final class DateReminderUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

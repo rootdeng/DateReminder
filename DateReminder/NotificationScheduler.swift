@@ -5,8 +5,11 @@ import SwiftData
 struct NotificationScheduler {
     static let shared = NotificationScheduler()
     private let center = UNUserNotificationCenter.current()
+    private static let delegate = NotificationDelegate()
     
-    private init() {}
+    private init() {
+        center.delegate = Self.delegate
+    }
     
     func requestAuthorization() async {
         do {
@@ -21,7 +24,7 @@ struct NotificationScheduler {
     
     func refreshNotifications(for items: [Item]) async {
         // clear only our requests
-        await center.removeAllPendingNotificationRequests()
+        center.removeAllPendingNotificationRequests()
         
         for item in items where item.remind {
             await scheduleReminder(for: item)
@@ -56,8 +59,8 @@ struct NotificationScheduler {
         comps.minute = checkTime.minute
         
         let content = UNMutableNotificationContent()
-        content.title = "纪念日检查"
-        content.body = "查看今天是否有纪念日需要提醒"
+        content.title = "日期检查"
+        content.body = "查看今天是否有日期需要提醒"
         content.sound = .default
         
         let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: true)
@@ -72,24 +75,32 @@ struct NotificationScheduler {
     private func computeDailyCheckTime(from items: [Item]) -> (hour: Int, minute: Int) {
         let defaultHour = 8
         let defaultMinute = 0
-        let earliest = items
-            .filter { $0.remind }
-            .map { ($0.reminderHour, $0.reminderMinute) }
-            .sorted { lhs, rhs in
-                lhs.0 == rhs.0 ? lhs.1 < rhs.1 : lhs.0 < rhs.0
+        let defaultTotal = defaultHour * 60 + defaultMinute
+
+        let earliestTotalMinutes = items.reduce(Int?.none) { current, item in
+            guard item.remind else { return current }
+            let minutes = item.reminderHour * 60 + item.reminderMinute
+            if let current {
+                return min(current, minutes)
+            } else {
+                return minutes
             }
-            .first
-        
-        guard let earliestTime = earliest else {
+        }
+
+        guard let earliest = earliestTotalMinutes else {
             return (defaultHour, defaultMinute)
         }
-        
-        if earliestTime.0 < defaultHour || (earliestTime.0 == defaultHour && earliestTime.1 < defaultMinute) {
-            let totalMinutes = earliestTime.0 * 60 + earliestTime.1
-            let adjusted = max(0, totalMinutes - 15)
+
+        if earliest < defaultTotal {
+            let adjusted = max(0, earliest - 15)
             return (adjusted / 60, adjusted % 60)
-        } else {
-            return (defaultHour, defaultMinute)
         }
+
+        return (defaultHour, defaultMinute)
+    }
+}
+private final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound, .list])
     }
 }
